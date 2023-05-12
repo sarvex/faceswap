@@ -62,7 +62,7 @@ class Sort():
 
         # If logging is enabled, prepare container
         if self._args.log_changes:
-            self.changes = dict()
+            self.changes = {}
 
             # Assign default sort_log.json value if user didn't specify one
             if self._args.log_file_path == 'sort_log.json':
@@ -73,9 +73,9 @@ class Sort():
             self.serializer = get_serializer_from_filename(self._args.log_file_path)
 
         # Prepare sort, group and final process method names
-        _sort = "sort_" + self._args.sort_method.lower()
-        _group = "group_" + self._args.group_method.lower()
-        _final = "final_process_" + self._args.final_process.lower()
+        _sort = f"sort_{self._args.sort_method.lower()}"
+        _group = f"group_{self._args.group_method.lower()}"
+        _final = f"final_process_{self._args.final_process.lower()}"
         if _sort.startswith('sort_color-'):
             self._args.color_method = _sort.replace('sort_color-', '')
             _sort = _sort[:10]
@@ -143,10 +143,7 @@ class Sort():
             # Check if non-dissimilarity sort method and group method are not the same
             if group_method.replace('group_', '') not in sort_method:
                 img_list = self.reload_images(group_method, img_list)
-                img_list = getattr(self, group_method)(img_list)
-            else:
-                img_list = getattr(self, group_method)(img_list)
-
+            img_list = getattr(self, group_method)(img_list)
         getattr(self, final_method)(img_list)
 
         logger.info("Done.")
@@ -177,8 +174,7 @@ class Sort():
 
         logger.info("Sorting...")
         matched_list = list(zip(filenames, distances))
-        img_list = sorted(matched_list, key=operator.itemgetter(1))
-        return img_list
+        return sorted(matched_list, key=operator.itemgetter(1))
 
     def sort_blur(self):
         """ Sort by blur amount """
@@ -226,8 +222,7 @@ class Sort():
 
         logger.info("Sorting...")
         matched_list = list(zip(filename_list, scores[:, channel_to_sort]))
-        sorted_file_img_list = sorted(matched_list, key=operator.itemgetter(1), reverse=True)
-        return sorted_file_img_list
+        return sorted(matched_list, key=operator.itemgetter(1), reverse=True)
 
     def sort_face(self):
         """ Sort by identity similarity """
@@ -256,8 +251,7 @@ class Sort():
         logger.info("Sorting by ward linkage...")
 
         indices = self._vgg_face.sorted_similarity(np.array(preds), method="ward")
-        img_list = np.array(filenames)[indices]
-        return img_list
+        return np.array(filenames)[indices]
 
     def sort_face_cnn(self):
         """ Sort by landmark similarity """
@@ -285,7 +279,7 @@ class Sort():
         logger.info("Sorting by landmark dissimilarity...")
         filename_list, _, landmarks = self._get_landmarks()
         scores = np.zeros(len(filename_list), dtype='float32')
-        img_list = list(list(items) for items in zip(filename_list, landmarks, scores))
+        img_list = [list(items) for items in zip(filename_list, landmarks, scores)]
 
         logger.info("Comparing landmarks...")
         img_list_len = len(img_list)
@@ -328,8 +322,7 @@ class Sort():
 
         logger.info("Sorting...")
         matched_list = list(zip(filenames, yaws))
-        img_list = sorted(matched_list, key=operator.itemgetter(1), reverse=True)
-        return img_list
+        return sorted(matched_list, key=operator.itemgetter(1), reverse=True)
 
     def sort_hist(self):
         """ Sort by image histogram similarity """
@@ -368,13 +361,13 @@ class Sort():
 
         img_list_len = len(img_list)
         for i in tqdm(range(0, img_list_len), desc="Comparing histograms", file=sys.stdout):
-            score_total = 0
-            for j in range(0, img_list_len):
-                if i == j:
-                    continue
-                score_total += cv2.compareHist(img_list[i][1],
-                                               img_list[j][1],
-                                               cv2.HISTCMP_BHATTACHARYYA)
+            score_total = sum(
+                cv2.compareHist(
+                    img_list[i][1], img_list[j][1], cv2.HISTCMP_BHATTACHARYYA
+                )
+                for j in range(0, img_list_len)
+                if i != j
+            )
             img_list[i][2] = score_total
 
         logger.info("Sorting...")
@@ -461,7 +454,7 @@ class Sort():
         logger.info("Grouping by face-cnn similarity...")
 
         # Groups are of the form: group_num -> reference faces
-        reference_groups = dict()
+        reference_groups = {}
 
         # Bins array, where index is the group number and value is
         # an array containing the file paths to the images in that group.
@@ -485,9 +478,7 @@ class Sort():
             for key, references in reference_groups.items():
                 try:
                     score = self.get_avg_score_faces_cnn(fl1, references)
-                except TypeError:
-                    score = float("inf")
-                except ZeroDivisionError:
+                except (TypeError, ZeroDivisionError):
                     score = float("inf")
                 if score < current_best[1]:
                     current_best[0], current_best[1] = key, score
@@ -529,19 +520,11 @@ class Sort():
         """ Group into bins by histogram """
         logger.info("Grouping by histogram...")
 
-        # Groups are of the form: group_num -> reference histogram
-        reference_groups = dict()
-
-        # Bins array, where index is the group number and value is
-        # an array containing the file paths to the images in that group
-        bins = []
-
         min_threshold = self._args.min_threshold
 
         img_list_len = len(img_list)
-        reference_groups[0] = [img_list[0][1]]
-        bins.append([img_list[0][0]])
-
+        reference_groups = {0: [img_list[0][1]]}
+        bins = [[img_list[0][0]]]
         for i in tqdm(range(1, img_list_len),
                       desc="Grouping",
                       file=sys.stdout):
@@ -680,7 +663,7 @@ class Sort():
             histograms = [cv2.calcHist([img], [0], None, [256], [0, 256]) for img in image_list]
             temp_list = list(zip(filename_list, histograms))
         else:
-            raise ValueError("{} group_method not found.".format(group_method))
+            raise ValueError(f"{group_method} group_method not found.")
 
         return self.splice_lists(img_list, temp_list)
 
@@ -701,9 +684,12 @@ class Sort():
             path = np.einsum_path(operation, imgs[0][..., :3], conversion, optimize='optimal')[0]
 
         progress_bar = tqdm(imgs, desc="Converting", file=sys.stdout)
-        images = [np.einsum(operation, img[..., :3], conversion, optimize=path).astype('float32')
-                  for img in progress_bar]
-        return images
+        return [
+            np.einsum(operation, img[..., :3], conversion, optimize=path).astype(
+                'float32'
+            )
+            for img in progress_bar
+        ]
 
     @staticmethod
     def splice_lists(sorted_list, new_vals_list):
@@ -737,9 +723,11 @@ class Sort():
         result = []
         extensions = [".jpg", ".png", ".jpeg"]
         for root, _, files in os.walk(input_dir):
-            for file in files:
-                if os.path.splitext(file)[1].lower() in extensions:
-                    result.append(os.path.join(root, file))
+            result.extend(
+                os.path.join(root, file)
+                for file in files
+                if os.path.splitext(file)[1].lower() in extensions
+            )
             break
         return result
 
@@ -778,8 +766,7 @@ class Sort():
         if image.ndim == 3:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blur_map = cv2.Laplacian(image, cv2.CV_32F)
-        score = np.var(blur_map) / np.sqrt(image.shape[0] * image.shape[1])
-        return score
+        return np.var(blur_map) / np.sqrt(image.shape[0] * image.shape[1])
 
     @classmethod
     def estimate_blur_fft(cls, image, metadata=None):
@@ -826,8 +813,7 @@ class Sort():
         ifft_shift = np.fft.ifftshift(fft_shift)
         shift_back = np.fft.ifft2(ifft_shift)
         magnitude = np.log(np.abs(shift_back))
-        score = np.mean(magnitude)
-        return score
+        return np.mean(magnitude)
 
     @staticmethod
     def calc_landmarks_face_pitch(flm):

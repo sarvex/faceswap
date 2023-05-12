@@ -159,9 +159,11 @@ class AlignedFace():
         self._size = size
         self._dtype = dtype
         self._is_aligned = is_aligned
-        self._matrices = dict(legacy=_umeyama(landmarks[17:], _MEAN_FACE, True)[0:2],
-                              face=None,
-                              head=None)
+        self._matrices = dict(
+            legacy=_umeyama(landmarks[17:], _MEAN_FACE, True)[:2],
+            face=None,
+            head=None,
+        )
         self._padding = self._padding_from_coverage(size, coverage_ratio)
 
         self._cache = self._set_cache()
@@ -307,17 +309,19 @@ class AlignedFace():
         dict
             The Aligned Face cache
         """
-        return dict(pose=[None, Lock()],
-                    original_roi=[None, Lock()],
-                    landmarks=[None, Lock()],
-                    landmarks_normalized=[None, Lock()],
-                    average_distance=[None, Lock()],
-                    adjusted_matrix=[None, Lock()],
-                    interpolators=[None, Lock()],
-                    head_size=[dict(), Lock()],
-                    cropped_roi=[dict(), Lock()],
-                    cropped_size=[dict(), Lock()],
-                    cropped_slices=[dict(), Lock()])
+        return dict(
+            pose=[None, Lock()],
+            original_roi=[None, Lock()],
+            landmarks=[None, Lock()],
+            landmarks_normalized=[None, Lock()],
+            average_distance=[None, Lock()],
+            adjusted_matrix=[None, Lock()],
+            interpolators=[None, Lock()],
+            head_size=[{}, Lock()],
+            cropped_roi=[{}, Lock()],
+            cropped_size=[{}, Lock()],
+            cropped_slices=[{}, Lock()],
+        )
 
     def transform_points(self, points, invert=False):
         """ Perform transformation on a series of (x, y) co-ordinates in world space into
@@ -725,12 +729,7 @@ def _umeyama(source, destination, estimate_scale):
     else:
         T[:dim, :dim] = U @ np.diag(d) @ V
 
-    if estimate_scale:
-        # Eq. (41) and (42).
-        scale = 1.0 / src_demean.var(axis=0).sum() * (S @ d)
-    else:
-        scale = 1.0
-
+    scale = 1.0 / src_demean.var(axis=0).sum() * (S @ d) if estimate_scale else 1.0
     T[:dim, dim] = dst_mean - scale * (T[:dim, :dim] @ src_mean.T)
     T[:dim, :dim] *= scale
 

@@ -54,7 +54,7 @@ class MultiThread():
         logger.trace("args: %s, kwargs: %s", args, kwargs)
         self.daemon = True
         self._thread_count = thread_count
-        self._threads = list()
+        self._threads = []
         self._target = target
         self._args = args
         self._kwargs = kwargs
@@ -91,7 +91,7 @@ class MultiThread():
         """ Start a thread with the given method and args """
         logger.debug("Starting thread(s): '%s'", self._name)
         for idx in range(self._thread_count):
-            name = "{}_{}".format(self._name, idx)
+            name = f"{self._name}_{idx}"
             logger.debug("Starting thread %s of %s: '%s'",
                          idx + 1, self._thread_count, name)
             thread = FSThread(name=name,
@@ -133,7 +133,7 @@ class BackgroundGenerator(MultiThread):
         self.queue = queue or Queue.Queue(prefetch)
         self.generator = generator
         self._gen_args = args or tuple()
-        self._gen_kwargs = kwargs or dict()
+        self._gen_kwargs = kwargs or {}
         self.start()
 
     def _run(self):

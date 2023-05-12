@@ -51,8 +51,8 @@ class Alignments():
         self._meta = None
         self._data = self._load()
         self._update_legacy()
-        self._hashes_to_frame = dict()
-        self._hashes_to_alignment = dict()
+        self._hashes_to_frame = {}
+        self._hashes_to_alignment = {}
         self._thumbnails = Thumbnails(self)
         logger.debug("Initialized %s", self.__class__.__name__)
 
@@ -109,7 +109,7 @@ class Alignments():
             logger.debug("Generating hashes to frame")
             for frame_name, val in self._data.items():
                 for idx, face in enumerate(val["faces"]):
-                    self._hashes_to_frame.setdefault(face["hash"], dict())[frame_name] = idx
+                    self._hashes_to_frame.setdefault(face["hash"], {})[frame_name] = idx
         return self._hashes_to_frame
 
     @property
@@ -136,12 +136,12 @@ class Alignments():
     def mask_summary(self):
         """ dict: The mask type names stored in the alignments :attr:`data` as key with the number
         of faces which possess the mask type as value. """
-        masks = dict()
+        masks = {}
         for val in self._data.values():
             for face in val["faces"]:
                 if face.get("mask", None) is None:
                     masks["none"] = masks.get("none", 0) + 1
-                for key in face.get("mask", dict()):
+                for key in face.get("mask", {}):
                     masks[key] = masks.get(key, 0) + 1
         return masks
 
@@ -159,8 +159,7 @@ class Alignments():
             pts_time.append(meta["pts_time"])
             if meta["keyframe"]:
                 keyframes.append(idx)
-        retval = dict(pts_time=pts_time, keyframes=keyframes)
-        return retval
+        return dict(pts_time=pts_time, keyframes=keyframes)
 
     @property
     def thumbnails(self):
@@ -202,7 +201,7 @@ class Alignments():
         if extension[1:] == self._serializer.file_extension:
             logger.debug("Valid Alignments filename provided: '%s'", filename)
         else:
-            filename = "{}.{}".format(noext_name, self._serializer.file_extension)
+            filename = f"{noext_name}.{self._serializer.file_extension}"
             logger.debug("File extension set from serializer: '%s'",
                          self._serializer.file_extension)
         location = os.path.join(str(folder), filename)
@@ -229,8 +228,7 @@ class Alignments():
         """
         logger.debug("Loading alignments")
         if not self.have_alignments_file:
-            raise FaceswapError("Error: Alignments file not found at "
-                                "{}".format(self._file))
+            raise FaceswapError(f"Error: Alignments file not found at {self._file}")
 
         logger.info("Reading alignments from: '%s'", self._file)
         data = self._serializer.load(self._file)
@@ -264,7 +262,7 @@ class Alignments():
         now = datetime.now().strftime("%Y%m%d_%H%M%S")
         src = self._file
         split = os.path.splitext(src)
-        dst = split[0] + "_" + now + split[1]
+        dst = f"{split[0]}_{now}{split[1]}"
         logger.info("Backing up original alignments to '%s'", dst)
         os.rename(src, dst)
         logger.debug("Backed up alignments")
@@ -287,7 +285,7 @@ class Alignments():
         if pts_time[0] != 0:
             pts_time, keyframes = self._pad_leading_frames(pts_time, keyframes)
 
-        sample_filename = next(fname for fname in self.data)
+        sample_filename = next(iter(self.data))
         basename = sample_filename[:sample_filename.rfind("_")]
         logger.debug("sample filename: %s, base filename: %s", sample_filename, basename)
         logger.info("Saving video meta information to Alignments file")
@@ -303,16 +301,8 @@ class Alignments():
         logger.debug("Alignments count: %s, timestamp count: %s", len(self.data), len(pts_time))
         if len(self.data) != len(pts_time):
             raise FaceswapError(
-                "There is a mismatch between the number of frames found in the video file ({}) "
-                "and the number of frames found in the alignments file ({})."
-                "\nThis can be caused by a number of issues:"
-                "\n  - The video has a Variable Frame Rate and FFMPEG is having a hard time "
-                "calculating the correct number of frames."
-                "\n  - You are working with a Merged Alignments file. This is not supported for "
-                "your current use case."
-                "\nYou should either extract the video to individual frames, re-encode the "
-                "video at a constant frame rate and re-run extraction or work with a dedicated "
-                "alignments file for your requested video.".format(len(pts_time), len(self.data)))
+                f"There is a mismatch between the number of frames found in the video file ({len(pts_time)}) and the number of frames found in the alignments file ({len(self.data)}).\nThis can be caused by a number of issues:\n  - The video has a Variable Frame Rate and FFMPEG is having a hard time calculating the correct number of frames.\n  - You are working with a Merged Alignments file. This is not supported for your current use case.\nYou should either extract the video to individual frames, re-encode the video at a constant frame rate and re-run extraction or work with a dedicated alignments file for your requested video."
+            )
         self.save()
 
     @classmethod
@@ -389,7 +379,7 @@ class Alignments():
             ``True`` if the given frame_name exists within the alignments :attr:`data` and has at
             least 1 face associated with it, otherwise ``False``
         """
-        retval = bool(self._data.get(frame_name, dict()).get("faces", []))
+        retval = bool(self._data.get(frame_name, {}).get("faces", []))
         logger.trace("'%s': %s", frame_name, retval)
         return retval
 
@@ -412,7 +402,7 @@ class Alignments():
         if not frame_name:
             retval = False
         else:
-            retval = bool(len(self._data.get(frame_name, dict()).get("faces", [])) > 1)
+            retval = len(self._data.get(frame_name, {}).get("faces", [])) > 1
         logger.trace("'%s': %s", frame_name, retval)
         return retval
 
@@ -433,10 +423,14 @@ class Alignments():
             ``True`` if all faces in the current alignments possess the given ``mask_type``
             otherwise ``False``
         """
-        retval = any([(face.get("mask", None) is not None and
-                       face["mask"].get(mask_type, None) is not None)
-                      for val in self._data.values()
-                      for face in val["faces"]])
+        retval = any(
+            (
+                face.get("mask", None) is not None
+                and face["mask"].get(mask_type, None) is not None
+            )
+            for val in self._data.values()
+            for face in val["faces"]
+        )
         logger.debug(retval)
         return retval
 
@@ -457,7 +451,7 @@ class Alignments():
             The list of face dictionaries that appear within the requested frame_name
         """
         logger.trace("Getting faces for frame_name: '%s'", frame_name)
-        return self._data.get(frame_name, dict()).get("faces", [])
+        return self._data.get(frame_name, {}).get("faces", [])
 
     def _count_faces_in_frame(self, frame_name):
         """ Return number of faces that appear within :attr:`data` for the given frame_name.
@@ -473,7 +467,7 @@ class Alignments():
         int
             The number of faces that appear in the given frame_name
         """
-        retval = len(self._data.get(frame_name, dict()).get("faces", []))
+        retval = len(self._data.get(frame_name, {}).get("faces", []))
         logger.trace(retval)
         return retval
 
@@ -643,7 +637,7 @@ class Alignments():
         logger.debug("Checking for legacy alignments file formats: '%s'", location)
         filename = os.path.splitext(location)[0]
         for ext in (".json", ".p", ".pickle", ".yaml"):
-            legacy_filename = "{}{}".format(filename, ext)
+            legacy_filename = f"{filename}{ext}"
             if os.path.exists(legacy_filename):
                 logger.debug("Legacy alignments file exists: '%s'", legacy_filename)
                 _ = self._update_file_format(*os.path.split(legacy_filename))
@@ -667,8 +661,7 @@ class Alignments():
         """
         logger.info("Reformatting legacy alignments file...")
         old_location = os.path.join(str(folder), filename)
-        new_location = "{}.{}".format(os.path.splitext(old_location)[0],
-                                      self._serializer.file_extension)
+        new_location = f"{os.path.splitext(old_location)[0]}.{self._serializer.file_extension}"
         if os.path.exists(old_location):
             if os.path.exists(new_location):
                 logger.info("Using existing updated alignments file found at '%s'. If you do not "
@@ -741,10 +734,11 @@ class Alignments():
             ``True`` if not all landmarks are :class:`numpy.ndarray` otherwise ``False``
         """
         logger.debug("checking legacy landmarks as list")
-        retval = not all(isinstance(face["landmarks_xy"], np.ndarray)
-                         for val in self._data.values()
-                         for face in val["faces"])
-        return retval
+        return not all(
+            isinstance(face["landmarks_xy"], np.ndarray)
+            for val in self._data.values()
+            for face in val["faces"]
+        )
 
     def _update_legacy_landmarks_list(self):
         """ Update landmarks stored as `list` to :class:`numpy.ndarray`. """

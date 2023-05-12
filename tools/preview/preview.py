@@ -83,10 +83,11 @@ class Preview(tk.Tk):  # pylint:disable=too-few-public-methods
     @property
     def _available_masks(self):
         """ list: The mask names that are available for every face in the alignments file """
-        retval = [key
-                  for key, val in self._samples.alignments.mask_summary.items()
-                  if val == self._samples.alignments.faces_count]
-        return retval
+        return [
+            key
+            for key, val in self._samples.alignments.mask_summary.items()
+            if val == self._samples.alignments.faces_count
+        ]
 
     def _initialize_tkinter(self):
         """ Initialize a standalone tkinter instance. """
@@ -186,8 +187,8 @@ class Samples():
         self._display = display
         self._lock = lock
         self._trigger_patch = trigger_patch
-        self._input_images = list()
-        self._predicted_images = list()
+        self._input_images = []
+        self._predicted_images = []
 
         self._images = Images(arguments)
         self._alignments = Alignments(arguments,
@@ -288,11 +289,13 @@ class Samples():
         size = len(top_tail)
         retval = [top_tail[start:start + size // self._sample_size]
                   for start in range(0, size, size // self._sample_size)]
-        logger.debug("Indices pools: %s", ["{}: (start: {}, end: {}, size: {})".format(idx,
-                                                                                       min(pool),
-                                                                                       max(pool),
-                                                                                       len(pool))
-                                           for idx, pool in enumerate(retval)])
+        logger.debug(
+            "Indices pools: %s",
+            [
+                f"{idx}: (start: {min(pool)}, end: {max(pool)}, size: {len(pool)})"
+                for idx, pool in enumerate(retval)
+            ],
+        )
         return retval
 
     def generate(self):
@@ -316,7 +319,7 @@ class Samples():
         * Sets :attr:`_display.source` to the input images and flags that the display should be \
         updated
         """
-        self._input_images = list()
+        self._input_images = []
         for selection in self._random_choice:
             filename = os.path.basename(self._filelist[selection])
             image = self._images.load_one_image(self._filelist[selection])
@@ -338,7 +341,7 @@ class Samples():
         model predict function and add the output to :attr:`predicted`
         """
         with self._lock:
-            self._predicted_images = list()
+            self._predicted_images = []
             for frame in self._input_images:
                 self._predictor.in_queue.put(frame)
             idx = 0
@@ -562,7 +565,7 @@ class Patch():
         """
         logger.trace("Patching faces")
         self._converter.process(queue_in, queue_out)
-        swapped = list()
+        swapped = []
         idx = 0
         while idx < sample_size:
             logger.trace("Patching image %s of %s", idx + 1, sample_size)
@@ -605,7 +608,7 @@ class FacesDisplay():
         self._tk_vars = tk_vars
         self._padding = padding
 
-        self._faces = dict()
+        self._faces = {}
         self._centering = None
         self._faces_source = None
         self._faces_dest = None
@@ -613,9 +616,9 @@ class FacesDisplay():
 
         # Set from Samples
         self.update_source = False
-        self.source = list()  # Source images, filenames + detected faces
+        self.source = []
         # Set from Patch
-        self.destination = list()  # Swapped + patched images
+        self.destination = []
 
         logger.trace("Initialized %s", self.__class__.__name__)
 
@@ -717,19 +720,19 @@ class FacesDisplay():
         """ Extract the source faces from the source frames, along with their filenames and the
         transformation matrix used to extract the faces. """
         logger.debug("Updating source faces")
-        self._faces = dict()
+        self._faces = {}
         for image in self.source:
             detected_face = image["detected_faces"][0]
             src_img = image["image"]
             detected_face.load_aligned(src_img, size=self._size, centering=self._centering)
             matrix = detected_face.aligned.matrix
-            self._faces.setdefault("filenames",
-                                   list()).append(os.path.splitext(image["filename"])[0])
-            self._faces.setdefault("matrix", list()).append(matrix)
-            self._faces.setdefault("src", list()).append(transform_image(src_img,
-                                                                         matrix,
-                                                                         self._size,
-                                                                         self._padding))
+            self._faces.setdefault("filenames", []).append(
+                os.path.splitext(image["filename"])[0]
+            )
+            self._faces.setdefault("matrix", []).append(matrix)
+            self._faces.setdefault("src", []).append(
+                transform_image(src_img, matrix, self._size, self._padding)
+            )
         self.update_source = False
         logger.debug("Updated source faces")
 
@@ -737,7 +740,7 @@ class FacesDisplay():
         """ Extract the swapped faces from the swapped frames using the source face destination
         matrices. """
         logger.debug("Updating destination faces")
-        self._faces["dst"] = list()
+        self._faces["dst"] = []
         destination = self.destination if self.destination else [np.ones_like(src["image"])
                                                                  for src in self.source]
         for idx, image in enumerate(destination):
@@ -810,7 +813,7 @@ class ConfigTools():
     """
     def __init__(self):
         self._config = Config(None)
-        self.tk_vars = dict()
+        self.tk_vars = {}
         self._config_dicts = self._get_config_dicts()  # Holds currently saved config
 
     @property
@@ -826,8 +829,13 @@ class ConfigTools():
     @property
     def sections(self):
         """ list: The sorted section names that exist within the convert Configuration options. """
-        return sorted(set(plugin.split(".")[0] for plugin in self._config.config.sections()
-                          if plugin.split(".")[0] != "writer"))
+        return sorted(
+            {
+                plugin.split(".")[0]
+                for plugin in self._config.config.sections()
+                if plugin.split(".")[0] != "writer"
+            }
+        )
 
     @property
     def plugins_dict(self):
@@ -864,13 +872,13 @@ class ConfigTools():
             Each configuration section as keys, with the values as a dict of option:
             :class:`lib.gui.control_helper.ControlOption` pairs. """
         logger.debug("Formatting Config for GUI")
-        config_dicts = dict()
+        config_dicts = {}
         for section in self._config.config.sections():
             if section.startswith("writer."):
                 continue
             for key, val in self._config.defaults[section].items():
                 if key == "helptext":
-                    config_dicts.setdefault(section, dict())[key] = val
+                    config_dicts.setdefault(section, {})[key] = val
                     continue
                 cp_option = ControlPanelOption(title=key,
                                                dtype=val["type"],
@@ -882,8 +890,8 @@ class ConfigTools():
                                                rounding=val["rounding"],
                                                min_max=val["min_max"],
                                                helptext=val["helptext"])
-                self.tk_vars.setdefault(section, dict())[key] = cp_option.tk_var
-                config_dicts.setdefault(section, dict())[key] = cp_option
+                self.tk_vars.setdefault(section, {})[key] = cp_option.tk_var
+                config_dicts.setdefault(section, {})[key] = cp_option
         logger.debug("Formatted Config for GUI: %s", config_dicts)
         return config_dicts
 
@@ -1051,11 +1059,13 @@ class ActionFrame(ttk.Frame):  # pylint: disable=too-many-ancestors
         self.pack(side=tk.LEFT, anchor=tk.N, fill=tk.Y)
         self._options = ["color", "mask_type"]
         self._busy_tkvar = tk_vars["busy"]
-        self._tk_vars = dict()
+        self._tk_vars = {}
 
         d_locals = locals()
-        defaults = {opt: self._format_to_display(d_locals["selected_{}".format(opt)])
-                    for opt in self._options}
+        defaults = {
+            opt: self._format_to_display(d_locals[f"selected_{opt}"])
+            for opt in self._options
+        }
         self._busy_indicator = self._build_frame(defaults,
                                                  refresh_callback,
                                                  patch_callback,
@@ -1343,7 +1353,7 @@ class OptionsBook(ttk.Notebook):  # pylint:disable=too-many-ancestors
         self.pack(side=tk.RIGHT, anchor=tk.N, fill=tk.BOTH, expand=True)
         self.config_tools = config_tools
 
-        self._tabs = dict()
+        self._tabs = {}
         self._build_tabs()
         self._build_sub_tabs()
         self._add_patch_callback(patch_callback)

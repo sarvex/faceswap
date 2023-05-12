@@ -134,8 +134,9 @@ class Mask():  # pylint:disable=too-few-public-methods
         :class:`lib.multithreading.Multithread`:
             The thread that is feeding the extractor.
         """
-        masker_input = getattr(self,
-                               "_input_{}".format("faces" if self._input_is_faces else "frames"))
+        masker_input = getattr(
+            self, f'_input_{"faces" if self._input_is_faces else "frames"}'
+        )
         logger.debug("masker_input: %s", masker_input)
 
         args = tuple() if self._update_type == "output" else (self._extractor.input_queue, )
@@ -163,11 +164,11 @@ class Mask():  # pylint:disable=too-few-public-methods
                     logger.warning("Legacy faces discovered. These faces will be updated")
                     log_once = True
                 metadata = update_legacy_png_header(filename, self._alignments)
-                if not metadata:  # Face not found
-                    self._counts["skip"] += 1
-                    logger.warning("Legacy face not found in alignments file. This face has not "
-                                   "been updated: '%s'", filename)
-                    continue
+            if not metadata:  # Face not found
+                self._counts["skip"] += 1
+                logger.warning("Legacy face not found in alignments file. This face has not "
+                               "been updated: '%s'", filename)
+                continue
 
             frame_name = metadata["source"]["source_filename"]
             face_index = metadata["source"]["face_index"]
@@ -275,9 +276,12 @@ class Mask():  # pylint:disable=too-few-public-methods
         str:
             The suffix to be appended to the output filename
         """
-        sfx = "mask_preview_"
-        sfx += "face_" if not arguments.full_frame or self._input_is_faces else "frame_"
-        sfx += "{}.png".format(arguments.output_type)
+        sfx = "mask_preview_" + (
+            "face_"
+            if not arguments.full_frame or self._input_is_faces
+            else "frame_"
+        )
+        sfx += f"{arguments.output_type}.png"
         return sfx
 
     @staticmethod
@@ -301,7 +305,9 @@ class Mask():  # pylint:disable=too-few-public-methods
     def process(self):
         """ The entry point for the Mask tool from :file:`lib.tools.cli`. Runs the Mask process """
         logger.debug("Starting masker process")
-        updater = getattr(self, "_update_{}".format("faces" if self._input_is_faces else "frames"))
+        updater = getattr(
+            self, f'_update_{"faces" if self._input_is_faces else "frames"}'
+        )
         if self._update_type != "output":
             if self._input_is_faces:
                 self._faces_saver = ImagesSaver(self._loader.location, as_bytes=True)
@@ -388,8 +394,9 @@ class Mask():  # pylint:disable=too-few-public-methods
         else:
             mask_types = [self._mask_type]
 
-        if detected_face.mask is None or not any(mask in detected_face.mask
-                                                 for mask in mask_types):
+        if detected_face.mask is None or all(
+            mask not in detected_face.mask for mask in mask_types
+        ):
             logger.warning("Mask type '%s' does not exist for frame '%s' index %s. Skipping",
                            self._mask_type, frame, idx)
             return
@@ -398,10 +405,10 @@ class Mask():  # pylint:disable=too-few-public-methods
             if mask_type not in detected_face.mask:
                 # If extracting bisenet-fp mask, then skip versions which don't exist
                 continue
-            filename = os.path.join(self._saver.location, "{}_{}_{}".format(
-                os.path.splitext(frame)[0],
-                idx,
-                f"{mask_type}_{self._output['suffix']}"))
+            filename = os.path.join(
+                self._saver.location,
+                f"{os.path.splitext(frame)[0]}_{idx}_{mask_type}_{self._output['suffix']}",
+            )
             image = self._create_image(detected_face, mask_type)
             logger.trace("filename: '%s', image_shape: %s", filename, image.shape)
             self._saver.save(filename, image)

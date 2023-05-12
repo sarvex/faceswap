@@ -24,12 +24,15 @@ class RestoreArgs(FaceSwapArgs):
     @staticmethod
     def get_argument_list():
         """ Put the arguments in a list so that they are accessible from both argparse and gui """
-        argument_list = list()
-        argument_list.append(dict(
-            opts=("-m", "--model-dir"),
-            action=DirFullPaths,
-            dest="model_dir",
-            required=True,
-            help=_("Model directory. A directory containing the model you wish to restore from "
-                   "backup.")))
-        return argument_list
+        return [
+            dict(
+                opts=("-m", "--model-dir"),
+                action=DirFullPaths,
+                dest="model_dir",
+                required=True,
+                help=_(
+                    "Model directory. A directory containing the model you wish to restore from "
+                    "backup."
+                ),
+            )
+        ]
